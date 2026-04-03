@@ -1,0 +1,37 @@
+# Dependencies
+frontend/node_modules/
+backend/.venv/
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Next.js / frontend build
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Logs & local debug
+*.log
+backend/backend_debug.log
+frontend/dev.log
+frontend/out.log
+
+# Local user data (emotion memory)
+backend/user_memory.json
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Env secrets
+.env
+.env.*
+!.env.example
