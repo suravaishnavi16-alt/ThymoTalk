@@ -1,3 +1,12 @@
+---
+title: ThymoTalk Backend
+emoji: 🎙️
+colorFrom: yellow
+colorTo: gray
+sdk: docker
+pinned: false
+---
+
 # Voice Emotion Detection App
 
 An aesthetic, real-time voice emotion intelligent conversational confident built with Next.js and FastAPI. 

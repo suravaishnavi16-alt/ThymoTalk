@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy requirements from backend folder
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the code
-COPY . .
+# Copy the backend code into the container
+COPY backend/ .
 
 # Create cache directory for models and ensure permissions
 RUN mkdir -p /.cache && chmod -R 777 /.cache
@@ -21,6 +21,7 @@ RUN mkdir -p /.cache && chmod -R 777 /.cache
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=7860
+ENV HOME=/app
 
 # Run the application
 CMD ["python", "main.py"]
