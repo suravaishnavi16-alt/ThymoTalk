@@ -18,4 +18,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://suravaishnavi16-alt:$HF_TOKEN@huggingface.co/spaces/suravaishnavi16-alt/VoiceEmotion main
+        run: git push --force https://suravaishnavi:$HF_TOKEN@huggingface.co/spaces/suravaishnavi/VoiceEmotion main
