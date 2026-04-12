@@ -82,7 +82,8 @@ export default function Home() {
       const requestStart = performance.now();
 
       // 🔥 Speed Stage: Optimized API Call (Async Parallel Backend)
-      const response = await fetch("http://localhost:8000/analyze_chunk", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/analyze_chunk`, {
         method: "POST",
         body: formData,
       });
