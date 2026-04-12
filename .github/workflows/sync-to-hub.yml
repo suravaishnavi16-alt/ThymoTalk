@@ -1,4 +1,5 @@
 name: Sync to Hugging Face Hub
+# GitHub Action to sync repository with Hugging Face Space 'VoiceEmotion'
 on:
   push:
     branches: [main]
