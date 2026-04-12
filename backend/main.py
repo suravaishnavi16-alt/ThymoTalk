@@ -51,7 +51,11 @@ app = FastAPI(title="ThymoTalk Advanced Studio API", version="13.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://thymotalk.netlify.app",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
