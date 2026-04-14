@@ -8,9 +8,6 @@ import json
 import numpy as np
 from datetime import datetime
 from collections import deque
-import torch
-import librosa
-from transformers import pipeline
 import logging
 import subprocess
 import httpx 
@@ -61,23 +58,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🚀 LOCAL MODEL INITIALIZATION (Fallback Signals)
-device = 0 if torch.cuda.is_available() else -1
-audio_model = None
-text_model = None
-
-@app.on_event("startup")
-async def startup_event():
-    global audio_model, text_model
-    log_debug("Loading Local Models from cache...")
-    try:
-        audio_model = pipeline("audio-classification", model="superb/wav2vec2-base-superb-er", device=device, local_files_only=True)
-        text_model = pipeline("text-classification", model="bhadresh-savani/distilbert-base-uncased-emotion", top_k=1, device=device, local_files_only=True)
-        log_debug("Local models loaded successfully.")
-    except Exception as e:
-        audio_model = pipeline("audio-classification", model="superb/wav2vec2-base-superb-er", device=device)
-        text_model = pipeline("text-classification", model="bhadresh-savani/distilbert-base-uncased-emotion", top_k=1, device=device)
-        log_debug("Models downloaded.")
+# -------------------------------------------------------------------
+# HEALTH ENDPOINT (For Keep-Alive/Uptime)
+# -------------------------------------------------------------------
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 # -------------------------------------------------------------------
 # STAGE 5 FUNCTIONS: Groq & Fusion Logic
@@ -107,29 +93,6 @@ async def detect_emotion_with_llm(transcript: str) -> dict:
         log_debug(f"Stage 5 Groq Error: {e}")
         return {"emotion": "neutral", "confidence": 0.0, "reason": "LLM Fallback."}
 
-async def get_audio_results(combined_audio):
-    """Async CPU-bound audio processing."""
-    return await asyncio.to_thread(audio_model, combined_audio, top_k=8)
-
-def get_aggregated_audio_emotion(user_id: str, current_results: list):
-    """Stage 4 logic: handles subtle emotions and aggregation history."""
-    if user_id not in SESSION_STATE:
-        SESSION_STATE[user_id] = {"probs": deque(maxlen=6), "audio": np.array([], dtype=np.float32)}
-    
-    current_map = {r['label'].lower(): r['score'] for r in current_results}
-    SESSION_STATE[user_id]["probs"].append(current_map)
-    labels = ["happy", "sad", "angry", "fear", "disgust", "surprised", "neutral", "calm"]
-    history = SESSION_STATE[user_id]["probs"]
-    
-    aggregated_scores = {}
-    for label in labels:
-        weights = [h.get(label, 0.0)**1.5 for h in history]
-        aggregated_scores[label] = sum(weights) / (len(history) if history else 1.0)
-    
-    top_emotion = max(aggregated_scores, key=aggregated_scores.get)
-    win_scores = [h.get(top_emotion, 0.0) for h in history]
-    avg_score = sum(win_scores) / (len(win_scores) if win_scores else 1.0)
-    return top_emotion, avg_score
 
 def generate_human_response(emotion: str, transcript: str) -> str:
     """Stage 5 Target: Supportive and natural, not just a label."""
