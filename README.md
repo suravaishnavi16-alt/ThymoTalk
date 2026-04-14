@@ -1,55 +1,50 @@
----
-title: ThymoTalk Backend
-emoji: 🎙️
-colorFrom: yellow
-colorTo: gray
-sdk: docker
-pinned: false
----
+# ThymoTalk.AI (Advanced Hybrid Emotion Engine)
 
-# Voice Emotion Detection App
+ThymoTalk is a real-time, highly empathetic Voice Assistant powered by a dual-signal Hybrid AI Architecture. It listens to your voice and analyzes both the **acoustic tone** (how you sound) and the **semantic context** (what you say) to provide natural, supportive, and instantaneous responses.
 
-An aesthetic, real-time voice emotion intelligent conversational confident built with Next.js and FastAPI. 
+## 🚀 Features
 
-## Design Philosophy
+- **Real-Time Voice Streaming**: Processes audio chunks instantly without waiting for sentence completion.
+- **Hybrid "Smart Fusion" Engine**:
+  - **Acoustic Layer**: A custom 1D-CNN trained on MFCC voice features to detect raw tonal emotion (Happy, Sad, Angry, Fear, etc.).
+  - **Semantic Layer (LLM)**: Integration with the blazing-fast **Groq API (Llama 3)** to understand complex context and nuances like *Anxiety*, *Guilt*, and *Jealousy*.
+- **Ultra-Fast Turn-Taking**: A conversational silence threshold of **300ms**, making it feel like a natural human interaction.
+- **Zero-Latency UX**: Immediate frontend visual feedback ("Listening...", "Thinking...") to eliminate perceived latency.
 
-This project adopts a highly professional, 3-color minimalist aesthetic (Deep Navy, Cream/Off-white, and Muted Gold). Emojis and visual clutter are completely eliminated to ensure a frictionless, high-quality user experience.
+## 🛠️ Technology Stack
 
-## Real-Time Architecture
+- **Frontend**: Next.js 14, React, TailwindCSS, Web Audio API
+- **Backend**: FastAPI (Python), Uvicorn, asyncio
+- **Machine Learning**: TensorFlow/Keras (CNN), Librosa, Scikit-Learn
+- **External APIs**: Deepgram (Speech-to-Text), Groq (LLM Inference)
+- **Deployment**: Netlify (Frontend), Hugging Face Spaces (Backend/Docker)
 
-The Next.js frontend captures microphone audio directly and streams chunks continuously to the FastAPI backend. 
-If the backend detects a "Sad" or "Dull" hue in the user's voice during these chunks, it will trigger an immediate **verbal interrupt**, reading a comforting prompt back via browser Native Speech Synthesis without waiting for the user to finish speaking.
+## 💻 Local Development
 
-## Prerequisites
+### 1. Start the Backend
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # (or venv\Scripts\activate on Windows)
+pip install -r requirements.txt
+python main.py
+```
 
-- Node.js & npm
-- Python 3.9+
-- ffmpeg
+### 2. Start the Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## Frontend Setup
+### 3. Environment Variables
+You need a `.env` file in the `backend/` directory:
+```env
+DEEPGRAM_API_KEY=your_deepgram_key
+GROQ_API_KEY=your_groq_key
+```
 
-1. Open a terminal and navigate to the `frontend` folder.
-2. Install dependencies (Requires `lucide-react` for minimalist icons).
-   ```bash
-   cd frontend
-   npm install
-   ```
-3. Start the UI:
-   ```bash
-   npm run dev
-   ```
+## 🧠 Model Training
+The CNN model was trained on a custom synthesized dataset using the Deepgram TTS engine to generate emotional voice variants across different pitches and speeds. The training scripts are available in `backend/ml_model/`.
 
-## Backend Setup
-
-1. Open a terminal and navigate to the `backend` folder.
-2. Install pip items:
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
-3. Run the microservice endpoint:
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-   ```
-
-Enjoy conversing with ThymoTalk.
+*UI Design inspired by premium, minimalist AI tools with glassmorphism and smooth dynamic real-time transcripts.*
