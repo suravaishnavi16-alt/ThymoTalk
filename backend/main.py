@@ -8,12 +8,15 @@ import json
 import numpy as np
 from datetime import datetime
 from collections import deque
+import random
 import logging
 import subprocess
 import httpx 
 import asyncio
-from groq import Groq # 🔥 Stage 5 Advanced Orchestration
+import librosa
+from groq import Groq 
 from dotenv import load_dotenv
+from ml_model.audio_model import predict_audio_emotion
 
 load_dotenv()
 
@@ -59,6 +62,18 @@ app.add_middleware(
 )
 
 # -------------------------------------------------------------------
+# STARTUP: Pre-load System
+# -------------------------------------------------------------------
+@app.on_event("startup")
+async def startup_event():
+    log_debug("Starting Hybrid AI Fusion Engine...")
+    try:
+        from ml_model.audio_model import get_predictor
+        await asyncio.to_thread(get_predictor)
+    except Exception as e:
+        log_debug(f"Pre-load warning: {e}")
+
+# -------------------------------------------------------------------
 # HEALTH ENDPOINT (For Keep-Alive/Uptime)
 # -------------------------------------------------------------------
 @app.get("/health")
@@ -94,18 +109,25 @@ async def detect_emotion_with_llm(transcript: str) -> dict:
         return {"emotion": "neutral", "confidence": 0.0, "reason": "LLM Fallback."}
 
 
+# --- EMOTION MAPPING (Optimized for Speed) ---
 def generate_human_response(emotion: str, transcript: str) -> str:
-    """Stage 5 Target: Supportive and natural, not just a label."""
+    """Lightweight response fetcher. No heavy regex or aliasing in real-time."""
+    primary = str(emotion).lower().strip()
+    
     responses = {
-        "happy": "That sounds very exciting! I'm glad to hear that.",
+        "happy": "That sounds great! I'm so happy for you.",
         "sad": "You sound a bit down. I'm here for you and listening.",
-        "angry": "I can sense some frustration in what you're saying. I'm here to listen.",
-        "fear": "It sounds like you're feeling a bit anxious. I'm here to support you.",
-        "surprised": "Oh, that sounds like quite a surprise! Tell me more about it.",
-        "neutral": "I'm listening. Tell me more about what's on your mind.",
-        "calm": "I appreciate your calm energy. I'm here for you."
+        "angry": "I can understand your frustration. I'm here to listen.",
+        "fear": "It sounds like you're feeling a bit anxious. You're safe here.",
+        "surprised": "Wow, that sounds like quite a surprise!",
+        "neutral": "I’m listening. Tell me more about that.",
+        "calm": "I appreciate your calm energy. I'm here for you.",
+        "anxiety": "I can sense some tension. You're safe here, take your time.",
+        "guilt": "It sounds like you're feeling guilty. It's okay, we all make mistakes.",
+        "jealousy": "That sounds like a difficult feeling. I'm here to listen."
     }
-    return responses.get(emotion.lower(), "I'm listening.")
+    
+    return responses.get(primary, responses["neutral"])
 
 async def transcribe_with_deepgram(contents):
     """Deepgram STT Task."""
@@ -132,10 +154,8 @@ def is_speech(audio, sr, threshold=0.0005):  # 🔥 LOWERED THRESHOLD
 # 🔥 --- CLEAN TRANSCRIPT ---
 def clean_transcript(text: str) -> str:
     import re
-    
-    # remove repeated phrases
-    text = re.sub(r'\b(\w+(?: \w+){0,5})\b(?: \1\b)+', r'\1', text, flags=re.IGNORECASE)
-    
+    # Only remove obvious repeated words within 3-word range to preserve flow
+    text = re.sub(r'\b(\w+)(?:\s+\1\b){1,2}', r'\1', text, flags=re.IGNORECASE)
     return text.strip()
 @app.post("/analyze_chunk")
 async def analyze_chunk(file: UploadFile = File(...), user_id: str = Form("default_user")):
@@ -173,7 +193,7 @@ async def analyze_chunk(file: UploadFile = File(...), user_id: str = Form("defau
         raw_transcript = await transcribe_with_deepgram(contents) or ""
         cleaned_chunk = clean_transcript(raw_transcript)
 
-        print("🎤 RAW:", raw_transcript)
+        print("RAW:", raw_transcript)
 
         # ---------- FILE MODE ----------
         is_file = len(current_samples) > sr * 2
@@ -192,15 +212,43 @@ async def analyze_chunk(file: UploadFile = File(...), user_id: str = Form("defau
                 }
 
             try:
+                # 1. Start with LLM (Primary intelligence)
                 res_llm = await detect_emotion_with_llm(final_transcript)
-            except:
-                res_llm = {"emotion": "neutral", "confidence": 0.5}
+                
+                # 2. Conditional Audio CNN
+                audio_res = None
+                word_count = len(final_transcript.split())
+                # Run audio ONLY if text is short OR LLM is unsure
+                if word_count < 3 or res_llm.get("confidence", 0) < 0.6:
+                    audio_res = await asyncio.to_thread(predict_audio_emotion, wav_path)
+                    audio_res["emotion"] = audio_res.get("emotion", "neutral").lower()
 
-            emotion = res_llm.get("emotion", "neutral").lower()
-            confidence = float(res_llm.get("confidence", 0.5) or 0.5)
+                # 3. Smart Fusion Logic
+                if res_llm.get("emotion", "").lower() in ["anxiety", "guilt", "jealousy"]:
+                    emotion = res_llm["emotion"]
+                    confidence = res_llm.get("confidence", 0.7)
+                elif audio_res and audio_res.get("confidence", 0) >= 0.70:
+                    emotion = audio_res["emotion"]
+                    confidence = audio_res["confidence"]
+                elif res_llm.get("confidence", 0) >= 0.55:
+                    emotion = res_llm["emotion"]
+                    confidence = res_llm["confidence"]
+                else:
+                    if audio_res and audio_res.get("emotion") == res_llm.get("emotion"):
+                        emotion = audio_res["emotion"]
+                        confidence = max(audio_res.get("confidence", 0), res_llm.get("confidence", 0))
+                    else:
+                        emotion = res_llm.get("emotion", "neutral")
+                        confidence = res_llm.get("confidence", 0.5)
 
-            if confidence < 0.2:
-                confidence = 0.85
+                if audio_res: print("Audio Signal (CNN Used):", audio_res)
+                print("LLM Signal (Groq Used):", res_llm)
+                print("Final Decision:", emotion)
+
+            except Exception as e:
+                log_debug(f"Fusion Error File Mode: {e}")
+                emotion = "neutral"
+                confidence = 0.5
 
             reply = generate_human_response(emotion, final_transcript)
 
@@ -214,21 +262,36 @@ async def analyze_chunk(file: UploadFile = File(...), user_id: str = Form("defau
             }
 
         # ---------- MIC MODE ----------
+        # Trigger "First Speech" time reset
+        if not state["text_buffer"] and cleaned_chunk:
+            state["last_time"] = time.time()
+
         # prevent duplicate
         if cleaned_chunk and not state["text_buffer"].endswith(cleaned_chunk):
             state["text_buffer"] += " " + cleaned_chunk
 
         buffer_text = state["text_buffer"].strip()
-
+        word_count = len(buffer_text.split())
         time_gap = time.time() - state["last_time"]
 
-        # wait until user stops speaking
-        if time_gap < 1.8:
+        # EAGER TRIGGER: If user speaks ≥ 3 words, they want an answer soon.
+        if word_count < 3 and time_gap < 0.3:
             state["last_time"] = time.time()
             return {
                 "emotion": "Listening",
                 "confidence": 0.0,
-                "response": "",
+                "response": random.choice(["Listening...", "I'm listening...", "Go on..."]),
+                "transcript": buffer_text,
+                "interrupt": False,
+                "urgent": False
+            }
+        
+        # If user spoke 3+ words but we're still within the quick-gap, show natural filler
+        if word_count >= 3 and time_gap < 0.3:
+            return {
+                "emotion": "Processing",
+                "confidence": 0.0,
+                "response": random.choice(["Got it...", "Thinking...", "Hmm...", "Let me think...", "I hear you..."]),
                 "transcript": buffer_text,
                 "interrupt": False,
                 "urgent": False
@@ -250,15 +313,42 @@ async def analyze_chunk(file: UploadFile = File(...), user_id: str = Form("defau
             }
 
         try:
+            # 1. Start with LLM
             res_llm = await detect_emotion_with_llm(final_transcript)
-        except:
-            res_llm = {"emotion": "neutral", "confidence": 0.5}
+            
+            # 2. Conditional Audio CNN
+            audio_res = None
+            word_count = len(final_transcript.split())
+            if word_count < 3 or res_llm.get("confidence", 0) < 0.6:
+                audio_res = await asyncio.to_thread(predict_audio_emotion, wav_path)
+                audio_res["emotion"] = audio_res.get("emotion", "neutral").lower()
 
-        emotion = res_llm.get("emotion", "neutral").lower()
-        confidence = float(res_llm.get("confidence", 0.5) or 0.5)
+            # 3. Smart Fusion Logic
+            if res_llm.get("emotion", "").lower() in ["anxiety", "guilt", "jealousy"]:
+                emotion = res_llm["emotion"]
+                confidence = res_llm.get("confidence", 0.7)
+            elif audio_res and audio_res.get("confidence", 0) >= 0.70:
+                emotion = audio_res["emotion"]
+                confidence = audio_res["confidence"]
+            elif res_llm.get("confidence", 0) >= 0.55:
+                emotion = res_llm["emotion"]
+                confidence = res_llm["confidence"]
+            else:
+                if audio_res and audio_res.get("emotion") == res_llm.get("emotion"):
+                    emotion = audio_res["emotion"]
+                    confidence = max(audio_res.get("confidence", 0), res_llm.get("confidence", 0))
+                else:
+                    emotion = res_llm.get("emotion", "neutral")
+                    confidence = res_llm.get("confidence", 0.5)
 
-        if confidence < 0.2:
-            confidence = 0.85
+            if audio_res: print("Audio Signal (CNN Used):", audio_res)
+            print("LLM Signal (Groq Used):", res_llm)
+            print("Final Decision:", emotion)
+
+        except Exception as e:
+            log_debug(f"Fusion Error Mic Mode: {e}")
+            emotion = "neutral"
+            confidence = 0.5
 
         reply = generate_human_response(emotion, final_transcript)
 
@@ -272,11 +362,11 @@ async def analyze_chunk(file: UploadFile = File(...), user_id: str = Form("defau
         }
 
     except Exception as e:
-        print("❌ ERROR:", e)
+        print("ERROR:", e)
         return {
             "emotion": "Neutral",
             "confidence": 0.5,
-            "response": "System error, retrying...",
+            "response": "I'm here, please continue.",
             "transcript": "",
             "interrupt": False,
             "urgent": False

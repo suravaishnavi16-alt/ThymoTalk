@@ -82,7 +82,7 @@ export default function Home() {
       const requestStart = performance.now();
 
       // 🔥 Speed Stage: Optimized API Call (Async Parallel Backend)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:7860";
       const response = await fetch(`${apiUrl}/analyze_chunk`, {
         method: "POST",
         body: formData,
@@ -153,7 +153,7 @@ export default function Home() {
       let silenceStart = Date.now();
       let lastChunkStart = Date.now();
       const SILENCE_THRESHOLD = 5;
-      const SILENCE_DURATION = 500;
+      const SILENCE_DURATION = 300;
 
       const captureLoop = () => {
         if (!analyserRef.current || !intervalRef.current) return;

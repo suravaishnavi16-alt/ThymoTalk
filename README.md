@@ -52,4 +52,4 @@ If the backend detects a "Sad" or "Dull" hue in the user's voice during these ch
    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-Enjoy conversing with EvolveX.
+Enjoy conversing with ThymoTalk.
