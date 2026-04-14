@@ -9,5 +9,6 @@ soundfile
 imageio-ffmpeg
 python-multipart
 aiohttp
-tensorflow-cpu
+tensorflow
 scikit-learn
+

@@ -25,6 +25,11 @@ frontend/out.log
 # Local user data (emotion memory)
 backend/user_memory.json
 
+# Local ML data and scratch
+backend/dataset/
+backend/dataset_raw/
+backend/scratch/
+
 # OS / IDE
 .DS_Store
 Thumbs.db
@@ -35,11 +40,3 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-
-# Large Data & Datasets
-backend/dataset/
-backend/dataset_raw/
-
-# Temporary / Scratch scripts
-backend/scratch/
-backend/backend_debug.log
